@@ -1,5 +1,12 @@
-import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
-import { setUser } from "../features/auth/authSlice";
+import {
+   BaseQueryApi,
+   BaseQueryFn,
+   DefinitionType,
+   FetchArgs,
+   createApi,
+   fetchBaseQuery,
+} from "@reduxjs/toolkit/query/react";
+import { logout, setUser } from "../features/auth/authSlice";
 import { RootState } from "../store";
 
 const baseQuery = fetchBaseQuery({
@@ -14,7 +21,11 @@ const baseQuery = fetchBaseQuery({
    },
 });
 
-const baseQueryWithRefreshToken = async (args, api, extraOptions) => {
+const baseQueryWithRefreshToken: BaseQueryFn<
+   FetchArgs,
+   BaseQueryApi,
+   DefinitionType
+> = async (args, api, extraOptions): Promise<any> => {
    const result = await baseQuery(args, api, extraOptions);
 
    if (result?.error?.status === 401) {
@@ -26,14 +37,20 @@ const baseQueryWithRefreshToken = async (args, api, extraOptions) => {
          }
       );
       const data = await res.json();
-      const user = (api.getState() as RootState).auth.user;
+      if (data?.data?.accessToken) {
+         const user = (api.getState() as RootState).auth.user;
 
-      api.dispatch(
-         setUser({
-            user,
-            token: data.data.accessToken,
-         })
-      );
+         api.dispatch(
+            setUser({
+               user,
+               token: data.data.accessToken,
+            })
+         );
+
+         await baseQuery(args, api, extraOptions);
+      } else {
+         api.dispatch(logout());
+      }
    }
    return result;
 };
